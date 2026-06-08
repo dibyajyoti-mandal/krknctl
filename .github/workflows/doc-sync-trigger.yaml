@@ -7,7 +7,7 @@ on:
 jobs:
   trigger:
     if: github.event.pull_request.merged == true
-    uses: dibyajyoti-mandal/Auto-doc/.github/workflows/dispatcher.yml@main
+    uses: dibyajyoti-mandal/Auto-doc/.github/workflows/dispatcher.yaml@main
     with:
       repo_name: ${{ github.repository }}
       pr_number: ${{ github.event.pull_request.number }}
