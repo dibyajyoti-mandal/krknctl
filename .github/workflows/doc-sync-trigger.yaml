@@ -1,16 +1,16 @@
-name: Docs sync trigger workflow
+name: Docs Sync
 
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
-    branches: [main]
 
 jobs:
   trigger:
     if: github.event.pull_request.merged == true
-    uses: dibyajyoti-mandal/Auto-doc/.github/workflows/dispatcher.yaml@main
+    uses: dibyajyoti-mandal/Auto-doc/.github/workflows/dispatcher.yml@main
     with:
       repo_name: ${{ github.repository }}
       pr_number: ${{ github.event.pull_request.number }}
       pr_title: ${{ github.event.pull_request.title }}
-    secrets: inherit
+    secrets:
+      BOT_TOKEN: ${{ secrets.DOCS_SYNC_BOT_TOKEN }}
