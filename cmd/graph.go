@@ -19,6 +19,7 @@ import (
 	"strings"
 )
 
+//graph flag in cobra
 func NewGraphCommand() *cobra.Command {
 	var command = &cobra.Command{
 		Use:   "graph",
