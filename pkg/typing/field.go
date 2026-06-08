@@ -117,6 +117,7 @@ func (f *InputField) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+//validator function
 func (f *InputField) Validate(value *string) (*string, error) {
 	var deferErr error
 	// if string value is nil, the default value is nil and the field is required the field is not valid
