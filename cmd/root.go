@@ -15,6 +15,9 @@ import (
 func Execute(providerFactory *factory.ProviderFactory, scenarioOrchestrator *scenarioorchestrator.ScenarioOrchestrator, config config.Config) {
 
 	rootCmd := NewRootCommand(config)
+	//test flag
+	rootCmd.Flags().String("test-doc-sync", "", "flag added to test documentation sync pipeline")
+
 	rootCmd.PersistentFlags().String("private-registry", "", "private registry URI (eg. quay.io, without any protocol schema prefix)")
 	rootCmd.PersistentFlags().String("private-registry-username", "", "private registry username for basic authentication")
 	rootCmd.PersistentFlags().String("private-registry-password", "", "private registry password for basic authentication")
