@@ -14,3 +14,4 @@ jobs:
       pr_title: ${{ github.event.pull_request.title }}
     secrets:
       BOT_TOKEN: ${{ secrets.DOCS_SYNC_BOT_TOKEN }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
