@@ -17,6 +17,7 @@ func Execute(providerFactory *factory.ProviderFactory, scenarioOrchestrator *sce
 	rootCmd := NewRootCommand(config)
 	//test flag
 	rootCmd.Flags().String("test-flag-doc-sync", "", "flag added to test documentation sync pipeline")
+	rootCmd.Flags().String("test-flag-doc-sync1", "", "flag added to test documentation sync pipeline1")
 	
 
 	rootCmd.PersistentFlags().String("private-registry", "", "private registry URI (eg. quay.io, without any protocol schema prefix)")
