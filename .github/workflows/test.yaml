@@ -68,17 +68,19 @@ jobs:
           args: --exclude G402 -tags=containers_image_openpgp ./...
 
       - name: run staticcheck static code analyzer
+        env:
+          GOTOOLCHAIN: local
         run: |
-          wget https://github.com/dominikh/go-tools/releases/latest/download/staticcheck_linux_amd64.tar.gz
-          tar xfvz staticcheck_linux_amd64.tar.gz
-          ./staticcheck/staticcheck -checks all ./...
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck -tags containers_image_openpgp -checks all ./...
           
       - name: run test suite
         env:
           CI_FORK_PR: ${{ github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name }}
+          CGO_ENABLED: 0
         run: |
          export USERID=$(id -u)
-         go test -tags containers_image_openpgp -race -json -v  -coverprofile=coverage.out ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
+         go test -mod=vendor -tags containers_image_openpgp -json -v  -coverprofile=coverage.out ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
          cat /tmp/gotest.log | go-ctrf-json-reporter -output ctrf-report.json > /dev/null
       - name: generate test report
         run: npx github-actions-ctrf ctrf-report.json

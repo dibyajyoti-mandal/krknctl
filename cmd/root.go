@@ -1,4 +1,5 @@
 // Package cmd contains the CLI options and commands to interact with krknctl
+// Assisted by Claude Sonnet 4
 package cmd
 
 import (
@@ -28,6 +29,7 @@ func Execute(providerFactory *factory.ProviderFactory, scenarioOrchestrator *sce
 	rootCmd.PersistentFlags().Bool("private-registry-skip-tls", false, "skips tls verification on private registry")
 	rootCmd.PersistentFlags().String("private-registry-token", "", "private registry identity token for token based authentication")
 	rootCmd.PersistentFlags().String("private-registry-scenarios", "", "private registry krkn scenarios image repository")
+	rootCmd.PersistentFlags().String("private-registry-assist", "", "private registry assist image repository")
 	var completionCmd = &cobra.Command{
 		Use:       "completion [bash|zsh]",
 		Short:     "Genera script di completamento per bash o zsh",
@@ -69,7 +71,8 @@ func Execute(providerFactory *factory.ProviderFactory, scenarioOrchestrator *sce
 	runCmd.LocalFlags().String("alerts-profile", "", "custom alerts profile file path")
 	runCmd.LocalFlags().String("metrics-profile", "", "custom metrics profile file path")
 	runCmd.LocalFlags().Bool("detached", false, "if set this flag will run in detached mode")
-
+	runCmd.LocalFlags().Bool("form", false, "Use interactive form to collect scenario parameters instead of CLI flags")
+	runCmd.LocalFlags().Bool("dry-run", false, "validate the scenario configuration locally (schema, required fields, value constraints) without cluster access, kubeconfig, image pulls, or execution")
 	runCmd.DisableFlagParsing = true
 	rootCmd.AddCommand(runCmd)
 
@@ -126,6 +129,35 @@ func Execute(providerFactory *factory.ProviderFactory, scenarioOrchestrator *sce
 	queryCmd := NewQueryStatusCommand(scenarioOrchestrator)
 	queryCmd.Flags().String("graph", "", "to query the exit status of a previously run graph file")
 	rootCmd.AddCommand(queryCmd)
+
+	// assist subcommands
+	assistCmd := NewAssistCommand()
+	assistRunCmd := NewAssistRunCommand(providerFactory, scenarioOrchestrator, config)
+	assistCmd.AddCommand(assistRunCmd)
+	rootCmd.AddCommand(assistCmd)
+	operatorCmd := NewOperatorCommand()
+	operatorInstallCmd := NewOperatorInstallCommand(config)
+	operatorInstallCmd.Flags().Bool("kind", false, "create a new single-node KinD cluster and deploy the operator onto it")
+	operatorInstallCmd.Flags().String("cluster-name", "krkn-operator", "KinD cluster name (only used with --kind)")
+	operatorInstallCmd.Flags().String("kubeconfig", "", "path to an existing kubeconfig to deploy the operator on")
+	operatorInstallCmd.Flags().String("namespace", "krkn-operator-system", "namespace to install the operator into")
+	operatorInstallCmd.Flags().String("chart-path", "", "local path to the Helm chart (overrides the remote default)")
+	operatorInstallCmd.Flags().String("operator-version", config.OperatorDefaultVersion, "operator chart version (used when installing from the remote OCI chart)")
+	operatorInstallCmd.Flags().Bool("port-forward", true, "after install, start a background port-forward of the console to http://localhost:8080")
+	operatorInstallCmd.Flags().Int("local-port", config.OperatorConsoleLocalPort, "local port to use for the console port-forward")
+	operatorInstallCmd.MarkFlagsMutuallyExclusive("kind", "kubeconfig")
+	operatorCmd.AddCommand(operatorInstallCmd)
+	operatorCmd.AddCommand(NewOperatorPortForwardDaemonCommand())
+
+	operatorUninstallCmd := NewOperatorUninstallCommand(config)
+	operatorUninstallCmd.Flags().Bool("kind", false, "delete the entire KinD cluster")
+	operatorUninstallCmd.Flags().String("cluster-name", "krkn-operator", "KinD cluster name to delete (only used with --kind)")
+	operatorUninstallCmd.Flags().String("kubeconfig", "", "path to the kubeconfig of the cluster to uninstall from")
+	operatorUninstallCmd.Flags().String("namespace", "krkn-operator-system", "namespace the operator was installed into")
+	operatorUninstallCmd.Flags().Bool("delete-namespace", false, "also delete the namespace after helm uninstall (only used with --kubeconfig)")
+	operatorUninstallCmd.MarkFlagsMutuallyExclusive("kind", "kubeconfig")
+	operatorCmd.AddCommand(operatorUninstallCmd)
+	rootCmd.AddCommand(operatorCmd)
 
 	// update and deprecation check
 	isDeprecated, err := IsDeprecated(config)

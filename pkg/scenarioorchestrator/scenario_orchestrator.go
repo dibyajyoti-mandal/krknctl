@@ -3,18 +3,27 @@ package scenarioorchestrator
 
 import (
 	"context"
+	"io"
+	"os"
+
 	"github.com/krkn-chaos/krknctl/pkg/config"
 	"github.com/krkn-chaos/krknctl/pkg/provider/models"
 	orchestrator_models "github.com/krkn-chaos/krknctl/pkg/scenarioorchestrator/models"
-	"io"
-	"os"
 )
 
-// PodmanCreateOptions are optional podman create flags (ignored by Docker).
+// PodmanCreateOptions contains runtime-specific container creation options.
+// Cross-platform fields: GPURequest
+// Podman-only fields: ImagePlatform, GroupAdd, SecurityOpts, Devices, CDIDevices
+// Docker ignores Podman-only fields; Podman ignores Docker-only patterns in GPURequest
 type PodmanCreateOptions struct {
 	ImagePlatform string
 	GroupAdd      []string
 	SecurityOpts  []string
+	Devices       map[string]string // host device path -> container device path (Podman)
+	CDIDevices    []string          // Podman CDI device specs (e.g., "nvidia.com/gpu=all")
+	GPURequest    string            // GPU request for both runtimes: "all" or "device=0,1"
+	                                 // Docker: uses DeviceRequest with --gpus semantics
+	                                 // Podman: converts to CDI nvidia.com/gpu=<value> if CDIDevices empty
 }
 
 type ScenarioOrchestrator interface {

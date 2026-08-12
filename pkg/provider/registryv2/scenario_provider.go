@@ -452,42 +452,19 @@ func (s *ScenarioProvider) getScenarioDetail(dataSource string, foundScenario *m
 	foundTitle := provider.GetKrknctlLabel(titleLabel, layers)
 	foundDescription := provider.GetKrknctlLabel(descriptionLabel, layers)
 	foundInputFields := provider.GetKrknctlLabel(inputFieldsLabel, layers)
-	if !isGlobalEnvironment {
 
-		foundIsAScenario := provider.GetKrknctlLabel(s.Config.LabelIsAScenario, layers)
-		foundHasRollback := provider.GetKrknctlLabel(s.Config.LabelHasRollback, layers)
-
-		if foundIsAScenario != nil {
-			parsedIsAScenario, err := s.ParseIsAScenario(*foundIsAScenario)
-			if err != nil {
-				return nil, err
-			}
-			scenarioDetail.IsAScenario = *parsedIsAScenario
-		} else {
-			scenarioDetail.IsAScenario = false
-		}
-
-		if foundHasRollback != nil {
-			parsedHasRollback, err := s.ParseHasRollback(*foundHasRollback)
-			if err != nil {
-				return nil, err
-			}
-
-			scenarioDetail.HasRollback = *parsedHasRollback
-		} else {
-			scenarioDetail.HasRollback = false
-		}
-
+	if err := s.BaseScenarioProvider.PopulateBooleanLabels(&scenarioDetail, layers, isGlobalEnvironment); err != nil {
+		return nil, err
 	}
 
 	if foundTitle == nil {
-		return nil, fmt.Errorf("%s LABEL not found in tag: %s digest: %s", strings.Replace(titleLabel, "=", "", 1), foundScenario.Name, *foundScenario.Digest)
+		return nil, fmt.Errorf("%s LABEL not found in tag: %s digest: %s: %w", strings.Replace(titleLabel, "=", "", 1), foundScenario.Name, *foundScenario.Digest, provider.ErrLabelNotFound)
 	}
 	if foundDescription == nil {
-		return nil, fmt.Errorf("%s LABEL not found in tag: %s digest: %s", strings.Replace(descriptionLabel, "=", "", 1), foundScenario.Name, *foundScenario.Digest)
+		return nil, fmt.Errorf("%s LABEL not found in tag: %s digest: %s: %w", strings.Replace(descriptionLabel, "=", "", 1), foundScenario.Name, *foundScenario.Digest, provider.ErrLabelNotFound)
 	}
 	if foundInputFields == nil {
-		return nil, fmt.Errorf("%s LABEL not found in tag: %s digest: %s", strings.Replace(inputFieldsLabel, "=", "", 1), foundScenario.Name, *foundScenario.Digest)
+		return nil, fmt.Errorf("%s LABEL not found in tag: %s digest: %s: %w", strings.Replace(inputFieldsLabel, "=", "", 1), foundScenario.Name, *foundScenario.Digest, provider.ErrLabelNotFound)
 	}
 
 	parsedTitle, err := s.BaseScenarioProvider.ParseTitle(*foundTitle, isGlobalEnvironment)

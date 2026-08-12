@@ -17,6 +17,7 @@ import (
 	"github.com/krkn-chaos/krknctl/pkg/provider"
 	"github.com/krkn-chaos/krknctl/pkg/provider/factory"
 	"github.com/krkn-chaos/krknctl/pkg/provider/models"
+	"github.com/krkn-chaos/krknctl/pkg/resiliency"
 	orchestratorModels "github.com/krkn-chaos/krknctl/pkg/scenarioorchestrator/models"
 	"github.com/krkn-chaos/krknctl/pkg/typing"
 	"github.com/spf13/cobra"
@@ -36,18 +37,27 @@ type GitHubRelease struct {
 	Body    string `json:"body"`
 }
 
-func NewSpinnerWithSuffix(suffix string) *spinner.Spinner {
+func NewSpinnerWithSuffix(suffix string, charSet ...int) *spinner.Spinner {
 	var s *spinner.Spinner = nil
-	s = spinner.New(spinner.CharSets[39], 100*time.Millisecond)
+	// Default to charset 39 if no charset provided
+	charset := 39
+	if len(charSet) > 0 {
+		charset = charSet[0]
+	}
+	s = spinner.New(spinner.CharSets[charset], 100*time.Millisecond)
 	s.Suffix = suffix
 	return s
 }
 
 func NewRootCommand(krknctlConfig config.Config) *cobra.Command {
 	var rootCmd = &cobra.Command{
-		Use:     "krknctl",
-		Short:   "krkn CLI",
-		Long:    `krkn Command Line Interface`,
+		Use:   "krknctl",
+		Short: "krkn CLI",
+		Long: `krkn Command Line Interface
+
+WARNING: krkn-dashboard is deprecated. If you are looking for a UI to interact
+with krkn, please use krkn-operator instead:
+  https://github.com/krkn-chaos/krkn-operator`,
 		Version: krknctlConfig.Version,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
@@ -124,6 +134,17 @@ func ParseFlags(scenarioDetail *models.ScenarioDetail, args []string, scenarioCo
 		}
 
 	}
+
+	// Set RESILIENCY_ENABLED_MODE based on PROMETHEUS_URL using resiliency helper
+	if cfg, err := config.LoadConfig(); err == nil {
+		promURL := ""
+		if prom, ok := environment["PROMETHEUS_URL"]; ok {
+			promURL = prom.value
+		}
+		mode := resiliency.ComputeResiliencyMode(promURL, cfg)
+		environment[cfg.EnvResiliencyEnabledMode] = ParsedField{value: mode, secret: false}
+	}
+
 	return &environment, &volumes, nil
 }
 

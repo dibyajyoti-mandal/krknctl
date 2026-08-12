@@ -22,12 +22,14 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"io"
 	"os"
-	"os/exec"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+
+	"os/exec"
+
+	"runtime"
 )
 
 type ScenarioOrchestrator struct {
@@ -68,6 +70,16 @@ func podmanCreateViaCLI(ctx context.Context, containerName, image string, env ma
 		}
 		for _, g := range extra.GroupAdd {
 			args = append(args, "--group-add", g)
+		}
+		for hostDev, containerDev := range extra.Devices {
+			args = append(args, "--device", fmt.Sprintf("%s:%s", hostDev, containerDev))
+		}
+		for _, cdiDev := range extra.CDIDevices {
+			args = append(args, "--device", cdiDev)
+		}
+		// If no CDI devices but GPURequest is set, convert to CDI format
+		if len(extra.CDIDevices) == 0 && extra.GPURequest != "" {
+			args = append(args, "--device", fmt.Sprintf("nvidia.com/gpu=%s", extra.GPURequest))
 		}
 	}
 	if len(publishPorts) > 0 {
@@ -161,8 +173,13 @@ func (c *ScenarioOrchestrator) Run(image string, containerName string, env map[s
 	}
 
 	// Darwin always uses CLI create (REST/bind quirks). Linux uses CLI when publishing ports
-	// (e.g. krknctl dashboard) so -p, --security-opt, and --group-add match containers/podman-run.sh.
-	if runtime.GOOS == "darwin" || len(publishPorts) > 0 {
+	// (e.g. krknctl dashboard) or when CDI devices are specified (e.g. nvidia.com/gpu=all) since
+	// CDI is not directly supported in the REST API specgen.
+	useCLI := runtime.GOOS == "darwin" || len(publishPorts) > 0
+	if podmanCreate != nil && len(podmanCreate.CDIDevices) > 0 {
+		useCLI = true
+	}
+	if useCLI {
 		containerID, err := podmanCreateViaCLI(ctx, containerName, image, env, volumeMounts, publishPorts, podmanCreate)
 		if err != nil {
 			return nil, err
@@ -190,10 +207,16 @@ func (c *ScenarioOrchestrator) Run(image string, containerName string, env map[s
 		s.Mounts = append(s.Mounts, containerMount)
 	}
 
-	s.NetNS = specgen.Namespace{
-		NSMode: "host",
-	}
 	if podmanCreate != nil {
+		// Add device mounts if specified
+		for _, v := range podmanCreate.Devices {
+			deviceSpec := specs.LinuxDevice{
+				Path: v,
+				Type: "c",
+			}
+			s.Devices = append(s.Devices, deviceSpec)
+		}
+
 		if podmanCreate.ImagePlatform != "" {
 			parts := strings.SplitN(podmanCreate.ImagePlatform, "/", 2)
 			if len(parts) == 2 {
@@ -215,7 +238,12 @@ func (c *ScenarioOrchestrator) Run(image string, containerName string, env map[s
 	return &createResponse.ID, nil
 }
 
-func (c *ScenarioOrchestrator) Attach(containerID *string, signalChannel chan os.Signal, stdout io.Writer, stderr io.Writer, ctx context.Context) (bool, error) {
+func (c *ScenarioOrchestrator) Attach(containerID *string,
+	signalChannel chan os.Signal,
+	stdout io.Writer,
+	stderr io.Writer,
+	ctx context.Context,
+) (bool, error) {
 
 	options := new(containers.AttachOptions).WithLogs(true).WithStream(true).WithDetachKeys("ctrl-c")
 

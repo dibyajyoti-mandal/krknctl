@@ -16,6 +16,9 @@ import (
 
 const MaxFileSize int64 = 10_485_760
 
+// InputField represents a single field in a scenario input schema.
+// Fields can represent user input (string, number, boolean, enum, file)
+// or metadata for organizing fields into logical groups (group type).
 type InputField struct {
 	Name              *string `json:"name"`
 	ShortDescription  *string `json:"short_description,omitempty"`
@@ -32,6 +35,11 @@ type InputField struct {
 	Requires          *string `json:"requires,omitempty"`
 	MutuallyExcludes  *string `json:"mutually_excludes,omitempty"`
 	Secret            bool    `json:"secret,omitempty"`
+	// Group specifies the logical grouping for this field.
+	// Fields with the same Group value are related and should be presented together.
+	// When Type is "group", this field IS a group definition containing metadata;
+	// otherwise, this field references which group it belongs to.
+	Group *string `json:"group,omitempty"`
 }
 
 type alias InputField
@@ -80,6 +88,17 @@ func (f *InputField) UnmarshalJSON(data []byte) error {
 		return errors.New("`type` key not found")
 	}
 
+	// Group fields are metadata-only and do not require variable or name
+	if f.Type == Group {
+		if fieldProperty, ok := temp["variable"]; ok {
+			f.Variable = &fieldProperty
+		}
+		if fieldProperty, ok := temp["name"]; ok {
+			f.Name = &fieldProperty
+		}
+		return nil
+	}
+
 	// variable must be always present since represents
 	// the envvar to be exported in the scenario_orchestrator
 	if fieldProperty, ok := temp["variable"]; ok {
@@ -112,6 +131,10 @@ func (f *InputField) UnmarshalJSON(data []byte) error {
 		f.Secret = secret
 	} else {
 		f.Secret = false
+	}
+
+	if fieldProperty, ok := temp["group"]; ok {
+		f.Group = &fieldProperty
 	}
 
 	return nil
@@ -234,9 +257,33 @@ func (f *InputField) Validate(value *string) (*string, error) {
 			} else {
 				return nil, errors.New("file `" + *selectedValue + "` is not a file or is not accessible")
 			}
+		case Group:
+			// Group is a special metadata type used to define field grouping information.
+			// Unlike other types that validate user input, Group fields store metadata
+			// describing a collection of related fields (e.g., title, short description,
+			// long description, icons, etc.). This metadata is consumed by frontend
+			// applications to organize and present fields with rich UI grouping.
+			//
+			// Since Group fields contain metadata rather than user input, any string
+			// value is considered valid. No format validation or constraints are applied.
+			return selectedValue, nil
 		default:
 			return nil, errors.New("impossible to validate object")
 		}
 	}
 	return selectedValue, deferErr
+}
+
+// GroupFieldsByGroup organizes a slice of InputFields into a map keyed by group name.
+// Fields without a group are placed under the empty string key.
+func GroupFieldsByGroup(fields []InputField) map[string][]InputField {
+	groups := make(map[string][]InputField)
+	for _, field := range fields {
+		group := ""
+		if field.Group != nil {
+			group = *field.Group
+		}
+		groups[group] = append(groups[group], field)
+	}
+	return groups
 }
